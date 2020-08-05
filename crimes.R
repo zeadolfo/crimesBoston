@@ -20,7 +20,7 @@ library(geoRglm)
 rm(list = ls())
 
 #Read the data 
-setwd("/home/ze/Área de Trabalho/Bases de dados/Crimes Boston/")
+setwd("/home/ze/Área de Trabalho/Bases de dados/Crimes Boston/crimesBoston/")
 dados <- fread("crime.csv")
 mapa <- readOGR("Boston_Neighborhoods.geojson")
 
@@ -118,7 +118,7 @@ tm_shape(mapa2) + tm_fill(col = "N") + tm_borders()
 
 #Robberies happened more often in the Dorchester and Roxbury 
 
-robbery <- as.geodata(dados_mes[OFFENSE_CODE_GROUP == "Robbery"], coords.col = 1:2, data.col = 5, covar.col = 4)
+robbery <- as.geodata(dados_tipo[OFFENSE_CODE_GROUP == "Robbery"], coords.col = 1:2, data.col = 4)
 
 plot(variog(robbery))
 
@@ -128,12 +128,12 @@ res1.v <- variog(robbery, trend = "1st")
 plot(res1.v, type = "b")
 res2.v <- variog(robbery, trend = "2nd")
 lines(res2.v, type = "b", lty = 2)
-# mc1 <- variog.mc.env(car_lacerny, obj = res1.v)
-# plot(res1.v, env = mc1, xlab = "u")
-# mc2 <- variog.mc.env(car_lacerny, obj = res2.v)
-# plot(res2.v, env = mc2, xlab = "u")
+mc1 <- variog.mc.env(robbery, obj = res1.v)
+plot(res1.v, env = mc1, xlab = "u")
+mc2 <- variog.mc.env(robbery, obj = res2.v)
+plot(res2.v, env = mc2, xlab = "u")
 
-modelo1 <- likfit(robbery, trend = ~factor(MONTH), ini.cov.pars = c(1,1))
+modelo1 <- likfit(robbery, trend = ~factor(MONTH), ini.cov.pars = c(1,1),cov.model = "matern", kappa = 1.5)
 modelo2 <- likfit(robbery, trend = "1st", ini.cov.pars = c(1,1),cov.model = "matern", kappa = 1.5)
 
 

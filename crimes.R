@@ -20,6 +20,8 @@ library(geoRglm)
 library(dplyr)
 library(doBy)
 library(cluster)
+library(ggcorrplot)
+source("http://www.sthda.com/upload/rquery_cormat.r")
 rm(list = ls())
 
 #Read the data 
@@ -75,9 +77,16 @@ res <- over(crimes_data, mapa)
 res <- cbind(res, crimes_data@data)
 crimes_dist <- summaryBy(data = res, res[,8:74] ~ Name, FUN = sum)
 
-cor(crimes_dist[,-1])
 
-clusteres <- hclust(crimes_dist[,-1])
+
+mat_cor <- cor(crimes_dist[,-1], method = "spearman")
+
+#There are more than 60 variables. So, it's important to know if it the variables are really important
+
+ola <- apply(crimes_dist[,-1], 2, f <- function(x){(x - min(x))/(max(x)-min(x))})
+comp_prin <- prcomp(ola)
+summary(comp_prin)
+#we need only five components instead of 60 variables
 
 
 conteo <- data.table(res)[!is.na(Name),.N, by = "Name"]

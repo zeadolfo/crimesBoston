@@ -17,6 +17,7 @@ library(geoR)
 library(tmap)
 library(lubridate)
 library(geoRglm)
+library(dplyr)
 rm(list = ls())
 
 #Read the data 
@@ -51,22 +52,35 @@ dados_mes <- dados[,.N, by = c("Long", "Lat", "MONTH", "OFFENSE_CODE_GROUP")]
 dados_tipo[,N := as.numeric(N)]
 dados_mes[,N := as.numeric(N)]
 
-#First analysis about homicides
-dados[OFFENSE_CODE_GROUP == "Homicide" & (YEAR %in% c(2016, 2017)), .N, by = "MONTH"] %>% group_by(MONTH) %>% summarize(n = sum(N)) %>% mutate(prop = n/sum(n))
-#Apparently there is small the homicide numbers in February and March 
-crimes <-  data.frame(Long = dados_mes[OFFENSE_CODE_GROUP == "Homicide" & MONTH == 6]$Long, Lat = dados_mes[OFFENSE_CODE_GROUP == "Homicide" & MONTH == 6]$Lat)
-crimes <- SpatialPoints(crimes)
-plot(mapa)
-plot(crimes, add = T, col = "blue")
-
-mapa2 <- SpatialPolygonsDataFrame(mapa, data = data.frame(mapa@data))
-crimes <-  data.frame(Long = dados_mes[OFFENSE_CODE_GROUP == "Homicide"]$Long, Lat = dados_mes[OFFENSE_CODE_GROUP == "Homicide"]$Lat)
+crimes <-  data.frame(Long = dados_tipo$Long, Lat = dados_tipo$Lat)
 crimes <- SpatialPointsDataFrame(coords = crimes, data = data.frame(id=1:dim(crimes)[1]), proj4string = CRS(proj4string(mapa2)))
 
 res <- over(crimes, mapa)
 
-res <- data.table(res)[,.N, by = "Name"]
-mapa2@data <- merge(mapa2@data, res, by = "Name", all.x = T, all.y = F)
+dados_tipo <- data.table(dados_tipo, res)
+
+
+
+##########################33#First analysis about homicides #####################333333333
+
+
+
+dados[OFFENSE_CODE_GROUP == "Homicide" & (YEAR %in% c(2016, 2017)), .N, by = "MONTH"] %>% group_by(MONTH) %>% summarize(n = sum(N)) %>% mutate(prop = n/sum(n))
+#Apparently there is less homicides in the winter and more in the summer   
+
+
+crimes <-  data.frame(Long = dados[OFFENSE_CODE_GROUP == "Homicide"]$Long, Lat = dados[OFFENSE_CODE_GROUP == "Homicide"]$Lat)
+crimes <- SpatialPoints(crimes)
+plot(mapa)
+plot(crimes, add = T, col = "blue")
+mapa2 <- SpatialPolygonsDataFrame(mapa, data = data.frame(mapa@data))
+
+crimes <-  data.frame(Long = dados_tipo[OFFENSE_CODE_GROUP == "Homicide"]$Long, Lat = dados_tipo[OFFENSE_CODE_GROUP == "Homicide"]$Lat)
+crimes <- SpatialPointsDataFrame(coords = crimes, data = data.frame(id=1:dim(crimes)[1]), proj4string = CRS(proj4string(mapa2)))
+
+conteo <- dados_tipo[OFFENSE_CODE_GROUP == "Homicide",.N, by = "Name"]
+
+mapa2@data <- merge(mapa2@data, conteo, by = "Name", all.x = T, all.y = F)
 mapa2@data$N <- ifelse(is.na(mapa2@data$N) , 0, mapa2@data$N)
 tm_shape(mapa2) + tm_fill(col = "N") + tm_borders()
 
@@ -120,6 +134,7 @@ tm_shape(mapa2) + tm_fill(col = "N") + tm_borders()
 
 robbery <- as.geodata(dados_tipo[OFFENSE_CODE_GROUP == "Robbery"], coords.col = 1:2, data.col = 4)
 
+
 plot(variog(robbery))
 
 #We can see the homicides are related with the distance, i.e., longer, more improbable to have 
@@ -137,7 +152,7 @@ modelo1 <- likfit(robbery, trend = ~factor(MONTH), ini.cov.pars = c(1,1),cov.mod
 modelo2 <- likfit(robbery, trend = "1st", ini.cov.pars = c(1,1),cov.model = "matern", kappa = 1.5)
 
 
-locales <- car_lacerny$coords
+locales <- robbery$coords
 KC <- krige.control(type = "sk", obj.mod = modelo1)
 sk <- krige.conv(car_lacerny, krige = KC, loc = locales)
 KCt <- krige.control(type = "sk", obj.mod = modelo2)

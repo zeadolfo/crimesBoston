@@ -18,6 +18,8 @@ library(tmap)
 library(lubridate)
 library(geoRglm)
 library(dplyr)
+library(doBy)
+library(cluster)
 rm(list = ls())
 
 #Read the data 
@@ -42,22 +44,50 @@ dados[, .N, by = "Long"][order(Long, decreasing = T)]
 dados <- dados[!is.na(Long)]
 dados <- dados[Long != -1]
 
-dados_crimenes <- dados[,.N, c("Location", "OFFENSE_CODE_GROUP")]
-crimes <- SpatialPointsDataFrame(dados_crimenes$Location, data = dados_crimenes$OFFENSE_CODE_GROU)
+dados_crimenes <- dados[,.N, c("Long", "Lat", "OFFENSE_CODE_GROUP")]
 
+coord <- SpatialPoints(data.frame(Long = dados_crimenes$Long, Lat = dados_crimenes$Lat))
+crimes <- SpatialPointsDataFrame(data.frame(Long = dados_crimenes$Long, Lat = dados_crimenes$Lat))
+
+crimes_reshape <- dcast(data = dados_crimenes, Long + Lat ~ OFFENSE_CODE_GROUP, value.var = "N")
 
 #Count by some interesting variables 
+
+##Which kind of crime is more common in each distric?
+crimes_coors <- crimes_reshape[,1:2]
+crimes_data <- crimes_reshape[,3:69]
+
+crimes_data <- apply(crimes_data, 2, f <- function(x) ifelse(is.na(x), 0 , x))
+crimes_data <- SpatialPointsDataFrame(crimes_coors, data = data.frame(crimes_data), proj4string = CRS(proj4string(mapa2)))
 dados_tipo <- dados[,.N, by = c("Long", "Lat", "OFFENSE_CODE_GROUP")]
 dados_mes <- dados[,.N, by = c("Long", "Lat", "MONTH", "OFFENSE_CODE_GROUP")]
 dados_tipo[,N := as.numeric(N)]
 dados_mes[,N := as.numeric(N)]
 
-crimes <-  data.frame(Long = dados_tipo$Long, Lat = dados_tipo$Lat)
-crimes <- SpatialPointsDataFrame(coords = crimes, data = data.frame(id=1:dim(crimes)[1]), proj4string = CRS(proj4string(mapa2)))
+crimes <-  data.frame(Long = dados$Long, Lat = dados$Lat)
 
-res <- over(crimes, mapa)
+plot(mapa)
+plot(crimes, add = T, col = "blue")
 
-dados_tipo <- data.table(dados_tipo, res)
+#We can only see the white areas, i.e., areas did not have crimes
+
+res <- over(crimes_data, mapa)
+res <- cbind(res, crimes_data@data)
+crimes_dist <- summaryBy(data = res, res[,8:74] ~ Name, FUN = sum)
+
+cor(crimes_dist[,-1])
+
+clusteres <- hclust(crimes_dist[,-1])
+
+
+conteo <- data.table(res)[!is.na(Name),.N, by = "Name"]
+conteo <- merge(conteo, mapa@data, by = "Name", all.x = T, all.y = F)
+
+
+#######################################################################################333
+
+
+res <- over(crimes_data, mapa)
 
 
 

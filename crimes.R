@@ -30,6 +30,7 @@ dados <- fread("crime.csv")
 mapa <- readOGR("Boston_Neighborhoods.geojson")
 
 
+
 dados[,.N, by = "STREET"]
 dados[, .N, by = "MONTH"][order(MONTH)]
 dados[, .N, by = "YEAR"][order(YEAR)]
@@ -81,7 +82,7 @@ crimes_dist <- summaryBy(data = res, res[,8:74] ~ Name, FUN = sum)
 
 mat_cor <- cor(crimes_dist[,-1], method = "spearman")
 
-#There are more than 60 variables. So, it's important to know if it the variables are really important
+#There are more than 27 variables. So, it's important to know if it the variables are really important
 
 ola <- apply(crimes_dist[,-1], 2, f <- function(x){(x - min(x))/(max(x)-min(x))})
 comp_prin <- prcomp(ola)

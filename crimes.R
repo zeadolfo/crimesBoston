@@ -215,7 +215,8 @@ skb <- krige.conv(robbery, locations = coordenadas, output = OC)
 #The model has a singular matrix because the most positions have only one robbery
 
 
-#Analysis by block 
+# Analysis by blocks instead of points. It is important because in this case there are a lot of zeros,
+# I had this idea because if only use the points, where I happened the crimes, I can lose the information about the safe blocks  
 
 blocks <- readOGR("c_bra_bl.json")
 
@@ -236,7 +237,6 @@ mapa2@data$N <- ifelse(is.na(mapa2@data$N) , 0, mapa2@data$N)
 tm_shape(mapa2) + tm_fill(col = "N") + tm_borders()
 
 
-
 centros <- gCentroid(mapa2, byid = T)
 robbery <- as.geodata(data.frame(centros, mapa2@data$N), coords.col = 1:2, data.col = 3)
 res1.v <- variog(robbery, trend = "1st")
@@ -247,7 +247,87 @@ res3.v <- variog4(robbery)
 plot(res3.v, type = "b")
 
 
-modelo1 <- likfit(robbery, ini.cov.pars = c(1.5,1.5))
+# There is a very interesting behaviour, there is a decreasing in the relantion of crimes until 175 meters and after increasing
+
+# modelo1 <- likfit(robbery, ini.cov.pars = c(1.5,1.5))
 
 
+
+
+
+################## Here is a model to beer consumption in Brazil ####################33
+
+library(data.table)
+library(ggplo2)
+library(dtplyr)
+library(forecast)
+library(tseries)
+setwd("/home/ze/Área de Trabalho/Bases de dados/consumo/")
+dados <- fread(file = "Consumo_cerveja.csv")
+dados <- dados[,-1]
+#it is a database about the beer comsumption in Sao Paulo - Brazil
+ggplot(dados, aes(x = as.Date(Data), y = consumo)) + geom_line(color = "darkblue") + scale_x_date(labels = date_format("%b"))
+#The series does not seem stationary  
+
+
+adf.test(dados$consumo)
+#The test confirms the series is stationary
+
+
+
+#The first model is a regression. I create a variable called fim_semana (weekend) and the day of the week 
+
+fim_semana <- c(rep(c(0,1,1,1,0,0,0), 52), 0)
+dados[, fim_semana := fim_semana]
+lunes <- c(rep(c(0,0,0,0,1,0,0), 52), 0)
+dados[, lunes := lunes]
+martes <- c(rep(c(0,0,0,0,0,1,0), 52), 0)
+dados[, martes := martes]
+miercoles <- c(rep(c(0,0,0,0,0,0,1), 52), 0)
+dados[, miercoles := miercoles]
+jueves <- c(rep(c(1,0,0,0,0,0,0), 52), 1)
+dados[, jueves := jueves]
+viernes <- c(rep(c(0,1,0,0,0,0,0), 52), 0)
+dados[, viernes := viernes]
+sabado <- c(rep(c(0,0,1,0,0,0,0), 52), 0)
+dados[, sabado := sabado]
+domingo <- c(rep(c(0,0,0,1,0,0,0), 52), 0)
+dados[, domingo := domingo]
+
+modelo <- lm(consumo ~ temp_max + fim_semana, data = dados)
+summary(modelo)
+BIC(modelo)
+plot(modelo)
+
+
+modelo <- lm(consumo ~ temp_max + lunes + martes + miercoles + jueves + viernes + sabado + domingo, data = dados)
+summary(modelo)
+BIC(modelo)
+plot(modelo)
+
+
+
+#It does not have any problem with the assumptions and the model with all day of the week has better BIC and AIC
+
+#The second model is a time series model using arima and i am not using the covariates temperature
+acf(dados$consumo)
+pacf(dados$consumo)
+cor(dados$consumo, dados$temp_med)
+cor(dados$consumo, dados$temp_max)
+cor(dados$consumo, dados$temp_min)
+ccf(dados$consumo, dados$temp_max)
+#It is seems a sarima with a component ar = 1 and seasonal ar = 1 an seasonal. Moreover, the beer consumption has a correlation with the average and the max temperature
+
+modelo2 <- arima(dados$consumo, c(0,0,0), seasonal = list(order = c(0,0,0), period = 7), xreg = data.table(temp_max = dados$temp_max, fim_semana = dados$fim_semana))
+modelo2
+acf(modelo2$residuals)
+pacf(modelo2$residuals)
+modelo2 <- arima(dados$consumo, c(7,0,0), seasonal = list(order = c(0,0,0), period = 7), xreg = data.table(temp_max = dados$temp_max, fim_semana = dados$fim_semana), transform.pars = F, fixed = c(0,0,NA,0,NA,0,NA,NA,NA,NA))
+modelo2
+acf(modelo2$residuals)
+pacf(modelo2$residuals)
+
+
+
+#The model with the best AIC and BIC is the regression with the day of the week
 

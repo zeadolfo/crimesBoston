@@ -31,6 +31,7 @@ setwd("/home/ze/Área de Trabalho/Bases de dados/Crimes Boston/crimesBoston/")
 dados <- fread("crime.csv")
 mapa <- readOGR("Boston_Neighborhoods.geojson")
 pobreza <- fread("pobreza_Boston.csv", header = T, dec = ",")
+ 
 
 pobreza <- pobreza[-24]
 
@@ -204,12 +205,49 @@ plot(res3.v, type = "b")
 #We can see the homicides are related with the distance, i.e., longer, more improbable to have 
 #We can see the trend the second order, apparently, does not have difference with the first order
 
-
-MC <- model.control()
+modelo1 <- likfit(robbery, trend = "1st", ini.cov.pars = c(1,1))
+MC <- model.control(trend.d = "cte", cov.model = "exponential")
 PC <- prior.control(phi.discrete = seq(0, 6, l = 21), phi.prior = "reciprocal", tausq.rel.prior = "unif", tausq.rel.discrete = seq(0, 1, l = 11))
-OC <- output.control(n.post = 1000, moments = T)
-skb <- krige.bayes(robbery, loc = coordenadas, model = MC, prior = PC, output = OC)
+OC <- output.control(n.post = 10, moments = T)
+KC <- krige.control(obj.model = modelo1)
+skb <- krige.conv(robbery, locations = coordenadas, output = OC)
+# skb <- krige.conv(robbery, loc = coordenadas, model = MC, prior = PC, output = OC)
 #The model has a singular matrix because the most positions have only one robbery
+
+
+#Analysis by block 
+
+blocks <- readOGR("c_bra_bl.json")
+
+crimes <-  data.frame(Long = dados_tipo[OFFENSE_CODE_GROUP == "Robbery"]$Long, Lat = dados_tipo[OFFENSE_CODE_GROUP == "Robbery"]$Lat)
+crimes <- SpatialPoints(crimes)
+plot(blocks)
+plot(crimes, add = T, col = "blue")
+
+mapa2 <- SpatialPolygonsDataFrame(blocks, data = data.frame(blocks@data))
+crimes <-  data.frame(Long = dados_tipo[OFFENSE_CODE_GROUP == "Robbery"]$Long, Lat = dados_tipo[OFFENSE_CODE_GROUP == "Robbery"]$Lat)
+crimes <- SpatialPointsDataFrame(coords = crimes, data = data.frame(id=1:dim(crimes)[1]), proj4string = CRS(proj4string(mapa2)))
+
+res <- over(crimes, mapa2)
+
+res <- data.table(res)[,.N, by = "id"][order(N, decreasing =  T)]
+mapa2@data <- merge(mapa2@data, res, by = "id", all.x = T, all.y = F)
+mapa2@data$N <- ifelse(is.na(mapa2@data$N) , 0, mapa2@data$N)
+tm_shape(mapa2) + tm_fill(col = "N") + tm_borders()
+
+
+
+centros <- gCentroid(mapa2, byid = T)
+robbery <- as.geodata(data.frame(centros, mapa2@data$N), coords.col = 1:2, data.col = 3)
+res1.v <- variog(robbery, trend = "1st")
+plot(res1.v, type = "b")
+res2.v <- variog(robbery, trend = "2nd")
+lines(res2.v, type = "b", lty = 2)
+res3.v <- variog4(robbery)
+plot(res3.v, type = "b")
+
+
+modelo1 <- likfit(robbery, ini.cov.pars = c(1.5,1.5))
 
 
 
